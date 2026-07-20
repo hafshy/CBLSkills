@@ -46,6 +46,22 @@ folders always travel together.
 
 ## Installing
 
+### Option A: `npx skills add`
+
+```bash
+npx skills add hafshy/CBLSkills --agent claude-code
+```
+
+This repo's `skills/<name>/SKILL.md` layout is directly compatible with the
+[`skills` CLI](https://github.com/vercel-labs/skills)'s discovery format, so `add`, `--list`,
+`--skill <name>`, and `--all` all work as documented there.
+
+**Important:** the CLI only copies `skills/*` — it doesn't know about `cbl_core/`, which every
+skill depends on. After running it, also copy `cbl_core/` into your project root (see Option B,
+step 2) or the installed skills will fail when they try to shell out to it.
+
+### Option B: manual copy
+
 1. Copy `skills/*` into wherever your Claude setup loads skills from (a project's
    `.claude/skills/` directory, a Cowork plugin's `skills/` folder, etc.).
 2. Copy `cbl_core/` into the same project root the skills will run in, and make sure it's
@@ -119,5 +135,4 @@ rather than patched over in skill prose.
 
 ## License
 
-Add a license of your choice before publishing (MIT is a reasonable default for a skill set like
-this).
+MIT — see [LICENSE](LICENSE).
