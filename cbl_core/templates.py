@@ -61,8 +61,17 @@ def parse_frontmatter(markdown_text):
     by this module (five flat fields, no nesting), so a tiny hand-rolled
     parser is safer than pulling in a YAML dependency for something this
     constrained.
+
+    The frontmatter/body boundary is a fixed "---\\n\\n" (closing marker,
+    then exactly one blank line) by construction -- both here and in
+    _write_with_frontmatter() below. That fixed contract is what makes
+    round-tripping through parse -> rewrite idempotent: earlier versions
+    used an *optional* newline here (`\\n?`), which silently consumed part
+    of the body's own leading blank line on every parse, so two or more
+    sync_frontmatter() calls on the same file would progressively eat the
+    separator until the heading ran directly into the closing "---".
     """
-    match = re.match(r"^---\n(.*?)\n---\n?(.*)$", markdown_text, re.DOTALL)
+    match = re.match(r"^---\n(.*?)\n---\n\n(.*)$", markdown_text, re.DOTALL)
     if not match:
         raise ValueError("No frontmatter block found at the top of this document.")
     fm_text, body = match.group(1), match.group(2)
@@ -82,12 +91,22 @@ def parse_frontmatter(markdown_text):
     return data, body
 
 
+def _write_with_frontmatter(frontmatter, body):
+    """The one place that joins a frontmatter block to a body -- always the
+    same fixed '---\\n\\n' boundary parse_frontmatter() expects back. Keeping
+    this in one function (rather than each caller hand-writing the join) is
+    what keeps parse/write actually idempotent -- see the note in
+    parse_frontmatter()."""
+    return f"{frontmatter}\n\n{body}"
+
+
 def generate_template(artifact_key):
     meta = schema.ARTIFACTS[artifact_key]
     frontmatter = _frontmatter_block(artifact_key)
     intro = INTRO_TEXT[meta["kind"]].format(title=meta["title"])
     body = EXECUTION_BODY if meta["kind"] == schema.KIND_EXECUTION else DECIDE_BODY
-    return f"{frontmatter}\n\n# {meta['title']}\n\n_{intro}_\n{body}"
+    body_content = f"# {meta['title']}\n\n_{intro}_\n{body}"
+    return _write_with_frontmatter(frontmatter, body_content)
 
 
 def sync_frontmatter(project_root, artifact_key, entry):
@@ -127,7 +146,7 @@ def sync_frontmatter(project_root, artifact_key, entry):
         stale=entry.get("stale", False),
     )
     with open(full_path, "w", encoding="utf-8") as f:
-        f.write(new_frontmatter + body)
+        f.write(_write_with_frontmatter(new_frontmatter, body))
 
 
 def scaffold_challenge_docs(project_root):

@@ -70,9 +70,15 @@ def update_artifact(project_root, key, *, status=None, decided_by=None,
     Update one artifact's entry in state.json.
 
     - Propagates staleness to downstream artifacts, but only when this call
-      is a genuine (re)decision -- status changing to a satisfied value it
-      wasn't already at. Logging a research finding or other minor writes
-      shouldn't mark the whole rest of the project stale.
+      is a genuine (re)decision: status changing to a satisfied value it
+      wasn't already at, OR an explicit decided_by is passed alongside an
+      already-satisfied status (a re-decision -- e.g. reopening and
+      re-locking-in the Big Idea after the rest of the project exists).
+      The second case matters because "decided" -> "decided" looks like a
+      no-op status change on its own; decided_by is what distinguishes a
+      real re-decision from an incidental re-save. Logging a research
+      finding or other minor writes (no decided_by, or status not
+      satisfied) shouldn't mark the whole rest of the project stale.
     - Refreshes the CBL Canvas as the last step by default. This is where
       "auto-refresh on every state.json write" is actually enforced in code,
       not left to each skill's instructions to remember.
@@ -95,7 +101,7 @@ def update_artifact(project_root, key, *, status=None, decided_by=None,
     became_satisfied_change = (
         status is not None
         and schema.is_satisfied(status)
-        and old_status != status
+        and (old_status != status or decided_by is not None)
     )
     if became_satisfied_change:
         for dep_key in schema.dependents_of(key):

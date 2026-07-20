@@ -30,6 +30,9 @@ body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; back
               letter-spacing: 0.06em; color: #6b6459; }
 .section .content { font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
 .placeholder { color: #b2ab9e; font-style: italic; }
+.stale-flag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px;
+              background: #f4dcae; color: #8a5a1a; font-size: 12px; font-weight: 600;
+              text-transform: none; letter-spacing: normal; vertical-align: middle; }
 .hero { font-size: 22px; font-weight: 600; }
 .footer { padding: 20px 32px; background: #f9f8f6; }
 .progress-bar { display: flex; gap: 4px; margin-top: 8px; }
@@ -118,14 +121,26 @@ def _excerpt(text, max_len=400):
     return paragraph
 
 
-def _section_html(title, key, project_root):
+def _stale_badge_html(state, key):
+    """A small inline badge for any artifact currently flagged stale --
+    surfaces the staleness-propagation mechanism (architecture plan S5)
+    visually, not just in cbl-status's JSON output. Without this, a team
+    could look straight at the canvas after reopening an earlier decision
+    and see no sign anything downstream needs a re-check."""
+    if state.get(key, {}).get("stale"):
+        return '<span class="stale-flag">needs review</span>'
+    return ""
+
+
+def _section_html(title, key, project_root, state):
     raw = _decision_text(project_root, key)
     excerpt = _excerpt(raw) if raw else None
     if excerpt:
         body_html = f'<div class="content">{html.escape(excerpt)}</div>'
     else:
         body_html = '<div class="content placeholder">Not yet reached.</div>'
-    return f'<div class="section"><h2>{html.escape(title)}</h2>{body_html}</div>'
+    badge = _stale_badge_html(state, key)
+    return f'<div class="section"><h2>{html.escape(title)}{badge}</h2>{body_html}</div>'
 
 
 def _phase_status(state, phase_keys):
@@ -163,25 +178,27 @@ def render_canvas(project_root):
 
     big_idea_headline = _headline(_decision_text(project_root, "big_idea")) or "not yet reached"
     eq_headline = _headline(_decision_text(project_root, "essential_question")) or "not yet reached"
+    header_badge = _stale_badge_html(state, "big_idea") or _stale_badge_html(state, "essential_question")
     header_html = (
-        f'<div class="header"><h1>{html.escape(big_idea_headline)}</h1>'
+        f'<div class="header"><h1>{html.escape(big_idea_headline)}{header_badge}</h1>'
         f'<div class="sub">{html.escape(eq_headline)}</div></div>'
     )
 
     challenge_excerpt = _excerpt(_decision_text(project_root, "challenge_statement"), max_len=200)
+    challenge_badge = _stale_badge_html(state, "challenge_statement")
     if challenge_excerpt:
         challenge_body = f'<div class="content hero">{html.escape(challenge_excerpt)}</div>'
     else:
         challenge_body = '<div class="content hero placeholder">Not yet reached.</div>'
-    challenge_html = f'<div class="section"><h2>Challenge Statement</h2>{challenge_body}</div>'
+    challenge_html = f'<div class="section"><h2>Challenge Statement{challenge_badge}</h2>{challenge_body}</div>'
 
     sections_html = "".join([
-        _section_html("Guiding Questions", "guiding_questions", project_root),
-        _section_html("Research Synthesis", "synthesis", project_root),
-        _section_html("Solution Concept", "solution_concepts", project_root),
-        _section_html("Prototype & Iteration", "prototype", project_root),
-        _section_html("Implementation & Evaluation", "implementation_evaluation", project_root),
-        _section_html("Reflection & Impact", "reflection_share", project_root),
+        _section_html("Guiding Questions", "guiding_questions", project_root, state),
+        _section_html("Research Synthesis", "synthesis", project_root, state),
+        _section_html("Solution Concept", "solution_concepts", project_root, state),
+        _section_html("Prototype & Iteration", "prototype", project_root, state),
+        _section_html("Implementation & Evaluation", "implementation_evaluation", project_root, state),
+        _section_html("Reflection & Impact", "reflection_share", project_root, state),
     ])
 
     footer_html = _footer_html(state)
